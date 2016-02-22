@@ -10,49 +10,28 @@ from binascii import hexlify
 import sys, traceback
 import argparse
 
-import wssserver
-
-usepympler = True
-
-try:
-	from pympler import tracker
-except ImportError:
-	usepympler = False
+from wss import Server
 
 PY3 = sys.version_info[0] == 3
 
 if PY3:
 		xrange = range
 
-class CameraServer(wssserver.Server):
+class CameraServer(Server):
 	clients = []
 	knownClients = {}
 	broadcastRate = 10
 	broadcastMsg = None
 	fps = 30.0
 
-	def __init__(self, hasFrameCb = None, fps = 30.0, port = 9001, usessl = True, sslcert = "server.crt", sslkey= "server.key", privateKeyFile = 'dhserver.key', clientsFile = "clients.json", loop = trollius.get_event_loop(), nopympler=True):
-		wssserver.Server.__init__(self, port, usessl, sslcert, sslkey, privateKeyFile, clientsFile)
+	def __init__(self, hasFrameCb = None, fps = 30.0, port = 9001, usessl = True, sslcert = "server.crt", sslkey= "server.key", auth = None, privateKeyFile = 'dhserver.key', clientsFile = "clients.json", loop = trollius.get_event_loop(), nopympler=True):
+		Server.__init__(self, port, usessl, sslcert, sslkey, auth, privateKeyFile, clientsFile)
 		self.loop = loop
 		self.fps = fps
 		self.hasFrame = hasFrameCb
 
 		self.loop.create_task(self.broadcastLoop())
 		self.loop.create_task(self.readCamera())
-		
-		if not nopympler:
-			self.loop.create_task(self.tracker())
-
-	@trollius.coroutine
-	def tracker(self):
-		if not usepympler:
-			return
-
-		tr = tracker.SummaryTracker()
-
-		while True:
-			tr.print_diff()
-			yield trollius.From(trollius.sleep(10))
 	
 	def broadcast(self, msg):
 		self.broadcastMsg = msg
@@ -61,10 +40,6 @@ class CameraServer(wssserver.Server):
 	def broadcastLoop(self):
 		print("starting broadcast loop")
 		try:
-			
-			if usepympler:
-				tr = tracker.SummaryTracker()
-
 			while True:
 				try:
 					if self.broadcastMsg is not None:
@@ -73,7 +48,7 @@ class CameraServer(wssserver.Server):
 						msg = bytes(data)
 						for c in self.clients:
 							c.sendMessage(msg, True)
-						del(data)				
+						del(data)
 				except: 
 					pass
 				finally:
