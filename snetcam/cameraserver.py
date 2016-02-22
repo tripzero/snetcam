@@ -3,171 +3,123 @@
 from __future__ import print_function 
 import cv2
 import numpy as np
-from autobahn.asyncio.websocket import WebSocketServerProtocol, \
-    WebSocketServerFactory
-import ssl
 import trollius
 import base64
 import json
 from binascii import hexlify
 import sys, traceback
 import argparse
-from dh import DH
 
-class Client:
-	isAuthenticated = False
+import wssserver
 
-	def __init__(self, handle):
-		self.handle = handle
+usepympler = True
 
-	def sendMessage(self, msg, isBinary):
-		if not self.isAuthenticated:
-			return
-		self.handle.sendMessage(msg, isBinary)
+try:
+	from pympler import tracker
+except ImportError:
+	usepympler = False
 
-class Server:
+PY3 = sys.version_info[0] == 3
+
+if PY3:
+		xrange = range
+
+class CameraServer(wssserver.Server):
 	clients = []
 	knownClients = {}
 	broadcastRate = 10
 	broadcastMsg = None
+	fps = 30.0
 
-	def __init__(self, privateKeyFile = 'dhserver.key', clientsFile = "clients.json"):
+	def __init__(self, hasFrameCb = None, fps = 30.0, port = 9001, usessl = True, sslcert = "server.crt", sslkey= "server.key", privateKeyFile = 'dhserver.key', clientsFile = "clients.json", loop = trollius.get_event_loop(), nopympler=True):
+		wssserver.Server.__init__(self, port, usessl, sslcert, sslkey, privateKeyFile, clientsFile)
+		self.loop = loop
+		self.fps = fps
+		self.hasFrame = hasFrameCb
 
-		self.diffieHelmut = DH(privateKeyFile)
-		try:
-			with open(clientsFile) as cf:
-				data = cf.read()
-				self.knownClients = json.loads(data)
-		except:
-			print("exception while parsing {0}".format(clientsFile))
-		self.secret = self.diffieHelmut.secret
-
-		trollius.get_event_loop().create_task(self.broadcastLoop())
-		trollius.get_event_loop().create_task(self.tracker())
-
-	def registerClient(self, client):
-		self.clients.append(Client(client))
-
-	def hasClients(self):
-		return len(self.clients)
-
-	def broadcast(self, msg):	
-		self.broadcastMsg = msg
-
-	def unregisterClient(self, client):
-		for c in self.clients:
-			if c.handle == client:
-				self.clients.remove(c)
+		self.loop.create_task(self.broadcastLoop())
+		self.loop.create_task(self.readCamera())
+		
+		if not nopympler:
+			self.loop.create_task(self.tracker())
 
 	@trollius.coroutine
 	def tracker(self):
-		from pympler import tracker
+		if not usepympler:
+			return
 
 		tr = tracker.SummaryTracker()
 
 		while True:
 			tr.print_diff()
 			yield trollius.From(trollius.sleep(10))
-
-	def authenticate(self, client, sharedSecret):
-		#TODO: do real authentication
-		for c in self.clients:
-			if c.handle == client:
-				symmetricKey = self.diffieHelmut.hashedSymmetricKey(sharedSecret)
-				symmetricKey = hexlify(symmetricKey)
-				
-				if not sharedSecret in self.knownClients:
-					if symmetricKey == self.knownClients[str(sharedSecret)]:
-						c.isAuthenticated = True
-						print("authentication success!")
-					else:
-						print("failed attempt to authenticate.  symmetric Key is wrong")
-						print("symmetricKey: ", symmetricKey)
-				else:
-					print("failed attempt at authenticating.  shared secret is not in clients file")
-					print("\"{0}\" : \"{1}\",".format(sharedSecret, symmetricKey))
-					c.handle.close()
 	
+	def broadcast(self, msg):
+		self.broadcastMsg = msg
+
 	@trollius.coroutine
 	def broadcastLoop(self):
 		print("starting broadcast loop")
 		try:
-			from pympler import tracker
-
-			tr = tracker.SummaryTracker()
-			while True:
-				if self.broadcastMsg is not None:
-					success, data = cv2.imencode('.jpg', self.broadcastMsg)
-					data = np.getbuffer(data)
-					msg = bytes(data)
-					for c in self.clients:
-						c.sendMessage(msg, True)
-					del(data)
-					
-				
-				yield trollius.From(trollius.sleep(1/self.broadcastRate))
-		except:
-			exc_type, exc_value, exc_traceback = sys.exc_info()
-			traceback.print_tb(exc_traceback, limit=1, file=sys.stdout)
-			traceback.print_exception(exc_type, exc_value, exc_traceback,
-                          limit=2, file=sys.stdout)
-
-class MyServerProtocol(WebSocketServerProtocol):
-	server = None
-
-	def onConnect(self, request):
-		print("Client connecting: {0}".format(request.peer))
-
-	def onOpen(self):
-		print("WebSocket connection open.")
-		MyServerProtocol.server.registerClient(self)
-		# send our shared secret:
-		print("sending auth to client")
-		payload = { "type" : "auth", "sharedSecret" : str(MyServerProtocol.server.diffieHelmut.sharedSecret) }
-		payload = json.dumps(payload)
-		self.sendMessage(payload, False)
-
-	def onMessage(self, payload, isBinary):
-		if isBinary:
-			print("Binary message received: {0} bytes".format(len(payload)))
-		else:
-			print("Text message received: {0}".format(payload.decode('utf8')))
-			msg = json.loads(payload.decode('utf8'))
 			
-			if 'sharedSecret' in msg and 'type' in msg and msg['type'] == 'auth':
-				# {'type' : 'auth', 'sharedSecret' : 'key'}
-				MyServerProtocol.server.authenticate(self, int(msg['sharedSecret']))
+			if usepympler:
+				tr = tracker.SummaryTracker()
 
-	def onClose(self, wasClean, code, reason):
-		try:
-			print("WebSocket connection closed: {0}".format(reason))
-			MyServerProtocol.server.unregisterClient(self)
+			while True:
+				try:
+					if self.broadcastMsg is not None:
+						success, data = cv2.imencode('.jpg', self.broadcastMsg)	
+						data = np.getbuffer(data)
+						msg = bytes(data)
+						for c in self.clients:
+							c.sendMessage(msg, True)
+						del(data)				
+				except: 
+					pass
+				finally:
+					yield trollius.From(trollius.sleep(1/self.broadcastRate))
 		except:
 			exc_type, exc_value, exc_traceback = sys.exc_info()
 			traceback.print_tb(exc_traceback, limit=1, file=sys.stdout)
 			traceback.print_exception(exc_type, exc_value, exc_traceback,
                           limit=2, file=sys.stdout)
 
-@trollius.coroutine
-def readCamera(cap):
-	frame = None
-	success = False
+	@trollius.coroutine
+	def readCamera(self):
+		cap = cv2.VideoCapture(0)
+		frame = None
+		success = False
 
-	if not cap.isOpened():
-		print("Failed to open camera!")
-		return
+		if not cap.isOpened():
+			print("Failed to open camera!")
+			return
 
-	while True:
-		success, frame = cap.read()
+		while True:
+			try: 
+				success, frame = cap.read()
 
-		if not success:
-			print("cap.read() failed")
+				if not success:
+					print("cap.read() failed")
+					yield trollius.From(trollius.sleep(1.0/self.fps))
+					continue
+				
+				self.broadcast(frame)
 
-		if MyServerProtocol.server.hasClients():
-			#send encoded data to any clients
-			MyServerProtocol.server.broadcast(frame)
+				if self.hasFrame:
+					self.hasFrame(frame)
 
-		yield trollius.From(trollius.sleep(1.0/30.0))
+			except KeyboardInterrupt:
+				self.loop.stop()
+
+			except:
+				exc_type, exc_value, exc_traceback = sys.exc_info()
+				traceback.print_tb(exc_traceback, limit=1, file=sys.stdout)
+				traceback.print_exception(exc_type, exc_value, exc_traceback,
+	                          limit=2, file=sys.stdout)
+
+			yield trollius.From(trollius.sleep(1.0/self.fps))
+
+		cap.release()
 
 
 if __name__ == '__main__':
@@ -175,34 +127,21 @@ if __name__ == '__main__':
 	parser.add_argument('--ssl', dest="usessl", help="use ssl.", action='store_true')
 	parser.add_argument('--sslcert', dest="sslcert", default="server.crt", nargs=1, help="ssl certificate")
 	parser.add_argument('--sslkey', dest="sslkey", default="server.key", nargs=1, help="ssl key")
+
 	args = parser.parse_args()
 
 	usessl = args.usessl
 
-	sslcontext = None
-
-	if usessl:
-		sslcontext = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
-		sslcontext.load_cert_chain(args.sslcert, args.sslkey)
-
-	MyServerProtocol.server = Server()
-
-	factory = WebSocketServerFactory(u"wss://127.0.0.1:9000", debug=False)
-	factory.protocol = MyServerProtocol
+	server = CameraServer(port=9000, usessl = usessl, sslcert=args.sslcert, sslkey = args.sslkey)
 
 	loop = trollius.get_event_loop()
-	coro = loop.create_server(factory, '', 9000, ssl=sslcontext)
-	server = loop.run_until_complete(coro)
-	cap = cv2.VideoCapture(0)
-	loop.create_task(readCamera(cap))
+	
 
 	print("starting server...")
 	try:
+		server.start()
 		loop.run_forever()
 	except KeyboardInterrupt:
 		pass
 	finally:
-		server.close()
 		loop.close()
-		cap.close()
-		broadcst.close()
