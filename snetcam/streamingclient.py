@@ -21,7 +21,11 @@ if __name__ == '__main__':
 	args = parser.parse_args()
 
 	client = Client()
-	client.connectTo(args.address, args.port, useSsl=args.usessl)
+	if client.connectTo(args.address, args.port, useSsl=args.usessl):
+		print("Connected!")
+	else:
+		print("Failed to connect")
+		
 	client.setBinaryHandler(showImage)
 
 	asyncio.get_event_loop().run_forever()
