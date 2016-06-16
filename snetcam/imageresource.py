@@ -54,7 +54,7 @@ class MultiprocessImageResource():
 	pollRate = 0.001
 	debug = False
 
-	def __init__(self, name, vars, processes=1, maxQueueSize=100, args=None):
+	def __init__(self, processes=1, maxQueueSize=100, args=None):
 		try:
 			self.pool = []
 			self.resultQueue = DeQueue(maxQueueSize)
@@ -68,6 +68,9 @@ class MultiprocessImageResource():
 					p = Process(target=self.process)
 				self.pool.append(p)
 				p.start()
+
+			asyncio.get_event_loop().create_task(self.poll())
+
 		except:
 			exc_type, exc_value, exc_traceback = sys.exc_info()
 			traceback.print_tb(exc_traceback, limit=1, file=sys.stdout)
@@ -105,6 +108,7 @@ class MultiprocessImageResource():
 			try:
 				result = self.resultQueue.get_nowait()
 				self.hasResult(result)
+				
 			except Empty:
 				pass
 			except:

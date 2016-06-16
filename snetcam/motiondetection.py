@@ -39,7 +39,9 @@ class MotionDetect(MultiprocessImageResource):
 		while True:
 			imgData = self.dataQueue.get()
 			try:
-				frame = dataToImage(imgData)
+				frame = dataToImage(imgData, True)
+				cv2.imshow("motion detected", frame)
+				cv2.waitKey(1)
 				#frame = cv2.pyrDown(frame)
 				#frame = cv2.pyrDown(frame)
 
@@ -76,7 +78,7 @@ class MotionDetect(MultiprocessImageResource):
 					#self.debug("no motion for this frame: {0}".format(stddev[0]))
 					self.resultQueue.put((False, None))
 			except KeyboardInterrupt:
-				return 
+				return
 			except:
 				self.debugOut("motion detect error!")
 				fakeOutput = FakeOutput()
@@ -85,4 +87,4 @@ class MotionDetect(MultiprocessImageResource):
 				traceback.print_exception(exc_type, exc_value, exc_traceback,
 		                        limit=10, file=fakeOutput)
 				self.debugOut(fakeOutput.msg)
-				#return 
+				#return

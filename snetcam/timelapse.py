@@ -62,7 +62,7 @@ class TimeLapseRecorder(MultiprocessImageResource):
 			while True:
 				try:
 					imgData = self.dataQueue.get(False)
-					img = dataToImage(imgData)
+					img = dataToImage(imgData, True)
 					width, height, layers = img.shape
 					cv2.putText(img, "date: {0}".format(datetime.now()), (0, height-20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255,255,255))
 
