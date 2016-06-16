@@ -1,4 +1,3 @@
-from redhouse import DAYS, HOURS, MINS
 from imageresource import MultiprocessImageResource, dataToImage, DeQueue
 
 import cv2
@@ -7,6 +6,15 @@ import trollius as asyncio
 from datetime import datetime, timedelta
 import traceback, sys
 from Queue import Empty
+
+def HOURS(h):
+	return h * 3600
+
+def DAYS(d):
+	return HOURS(d * 24)
+
+def MINS(m):
+	return m * 60
 
 class TimeLapseRecorder(MultiprocessImageResource):
 
@@ -18,7 +26,7 @@ class TimeLapseRecorder(MultiprocessImageResource):
 		self.length = length
 		self.fps = fps
 		self.outputFile = outputfile
-		
+
 	def startVideo(self):
 		fourcc = cv2.VideoWriter_fourcc(*'XVID')
 		self.videoDate = datetime.now() + timedelta(seconds=self.length)
@@ -51,7 +59,7 @@ class TimeLapseRecorder(MultiprocessImageResource):
 			self.startedTime = datetime.now()
 			self.debugOut("starting time lapse video")
 
-			while True:			
+			while True:
 				try:
 					imgData = self.dataQueue.get(False)
 					img = dataToImage(imgData)
