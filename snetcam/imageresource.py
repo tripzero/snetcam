@@ -97,8 +97,10 @@ class MultiprocessImageResource():
 			try:
 				msg = self.debugQueue.get_nowait()
 				print(msg)
+				
 			except Empty:
 				pass
+
 			except:
 				exc_type, exc_value, exc_traceback = sys.exc_info()
 				print("poll exception")
@@ -111,6 +113,7 @@ class MultiprocessImageResource():
 				
 			except Empty:
 				pass
+
 			except:
 				exc_type, exc_value, exc_traceback = sys.exc_info()
 				print("poll exception")
