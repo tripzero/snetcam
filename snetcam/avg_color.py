@@ -7,18 +7,33 @@ import trollius as asyncio
 class AverageColor(MultiprocessImageResource):
 
 	def __init__(self):
-		MultiprocessImageResource.__init__(self, 2, maxQueueSize=4)
+		MultiprocessImageResource.__init__(self, "avg_color", 2, maxQueueSize=4)
 
 	def process(self):
 		while True:
-			img = self.dataQueue.get()		
+			img = self.dataQueue.get()
+
+			img = dataToImage(img, True)
+
+			img = self.color_filter(img, (100, 100, 110), (110, 255, 160))
 			
 			result = cv2.mean(img)
 
 			self.resultQueue.put(result)
 
+	def color_filter(self, img, color_hsv_lower, color_hsv_upper):
+		hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+		mask = cv2.inRange(hsv, color_hsv_lower, color_hsv_upper)
+		res = cv2.bitwise_and(img, img, mask = mask)
+
+		cv2.imshow("mask", mask)
+		cv2.imshow("res", res)
+
+		cv2.waitKey(1)
+
 	def hasResult(self, result):
-		print(result)
+		self.setValue("color", result)
 
 @asyncio.coroutine
 def showImage(avgColor):

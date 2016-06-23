@@ -15,7 +15,8 @@ class WSResourceServer(Server):
 		self.port = port
 
 		self.numclients = len(self.clients)
-		self.addResource(self)
+		
+		asyncio.get_event_loop().create_task(self.poll())
 
 	def onMessage(self, msg, fromClient):
 		print ("message received", msg)
@@ -61,10 +62,10 @@ class WSResourceServer(Server):
 	def poll(self):
 		print("WSResourceServer: poll()")
 
+		rs = {}
+
 		while True:
 			try:
-				self.setValue("numclients", len(self.clients))
-
 				rs = {}
 				rs["resources"] = []
 
@@ -80,7 +81,6 @@ class WSResourceServer(Server):
 				self.broadcast(json.dumps(rs))
 
 			except:
-				print("data: {}".format(rs))
 				exc_type, exc_value, exc_traceback = sys.exc_info()
 				traceback.print_tb(exc_traceback, limit=2, file=sys.stdout)
 				traceback.print_exception(exc_type, exc_value, exc_traceback,
