@@ -14,7 +14,7 @@ class FakeOutput:
 class MotionDetect(MultiprocessImageResource):
 
 	def __init__(self, name, processes=1):
-		MultiprocessImageResource.__init__(self, name, ["motionDetected", "lastMotionDetected"], processes=processes)
+		MultiprocessImageResource.__init__(self, name, processes=processes)
 
 	def hasResult(self, result):
 		#print("queue size: {0}".format(self.dataQueue.qsize()))
@@ -27,6 +27,8 @@ class MotionDetect(MultiprocessImageResource):
 			#cv2.imshow("motion detected", frame)
 			#cv2.waitKey(1)
 			self.setValue("lastMotionDetected", str(datetime.now()))
+
+
 
 	def process(self):
 		self.debugOut("process forked and started!")
@@ -77,8 +79,10 @@ class MotionDetect(MultiprocessImageResource):
 				else:
 					#self.debug("no motion for this frame: {0}".format(stddev[0]))
 					self.resultQueue.put((False, None))
+
 			except KeyboardInterrupt:
 				return
+				
 			except:
 				self.debugOut("motion detect error!")
 				fakeOutput = FakeOutput()

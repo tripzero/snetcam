@@ -19,7 +19,7 @@ def MINS(m):
 class TimeLapseRecorder(MultiprocessImageResource):
 
 	def __init__(self, startTime=datetime.now().time(), interval=HOURS(24), length=DAYS(7), fps=30.0, outputfile="timelapse"):
-		MultiprocessImageResource.__init__(self, "timelapse", [], maxQueueSize=1, args=(startTime, interval, length, fps, outputfile,))
+		MultiprocessImageResource.__init__(self, "timelapse", processes=1, maxQueueSize=1, args=(startTime, interval, length, fps, outputfile,))
 
 		self.startTime = startTime
 		self.interval = interval

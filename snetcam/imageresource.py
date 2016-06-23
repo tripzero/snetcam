@@ -54,12 +54,16 @@ class MultiprocessImageResource():
 	pollRate = 0.001
 	debug = False
 
-	def __init__(self, processes=1, maxQueueSize=100, args=None):
+	def __init__(self, name, processes=1, maxQueueSize=100, args=None):
 		try:
 			self.pool = []
 			self.resultQueue = DeQueue(maxQueueSize)
 			self.dataQueue = DeQueue(maxQueueSize)
 			self.debugQueue = Queue()
+			self.name = name
+			self.variables = {}
+
+			print ("processes for {} = {}".format(name, processes))
 
 			for i in range(processes):
 				if args:
@@ -81,6 +85,9 @@ class MultiprocessImageResource():
 		for process in self.pool:
 			process.terminate()
 			process.join()
+
+	def setValue(self, name, value):
+		self.variables[name] = value
 
 	def debugOut(self, msg):
 		#if self.debug:
