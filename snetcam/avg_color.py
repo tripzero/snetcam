@@ -4,6 +4,14 @@ from imageresource import *
 import cv2
 import trollius as asyncio
 
+def color_filter(img, color_hsv_lower, color_hsv_upper):
+	hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+	mask = cv2.inRange(hsv, color_hsv_lower, color_hsv_upper)
+	res = cv2.bitwise_and(img, img, mask = mask)
+
+	return res
+
 class AverageColor(MultiprocessImageResource):
 
 	def __init__(self):
@@ -15,22 +23,11 @@ class AverageColor(MultiprocessImageResource):
 
 			img = dataToImage(img, True)
 
-			img = self.color_filter(img, (100, 100, 110), (110, 255, 160))
-			
+			img = color_filter(img, (30, 22, 62), (99, 130, 196))
+
 			result = cv2.mean(img)
 
 			self.resultQueue.put(result)
-
-	def color_filter(self, img, color_hsv_lower, color_hsv_upper):
-		hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-
-		mask = cv2.inRange(hsv, color_hsv_lower, color_hsv_upper)
-		res = cv2.bitwise_and(img, img, mask = mask)
-
-		cv2.imshow("mask", mask)
-		cv2.imshow("res", res)
-
-		cv2.waitKey(1)
 
 	def hasResult(self, result):
 		self.setValue("color", result)
