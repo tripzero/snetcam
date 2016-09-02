@@ -2,8 +2,24 @@
 # -*- coding: utf-8 -*-
 
 import sqlite3
-import crypt
 import os.path
+try:
+	from Crypto.Hash.SHA256 import SHA256Hash as sha256
+except:
+	from hashlib import sha256 
+
+try:
+	from rdrand import RdRandom
+	random = RdRandom()
+	print("using hardware rdrand random number generation")
+except:
+	try:
+		from Crypto.Random import random
+		print("using Crypto.Random for random number generation")
+
+	except:
+		import random
+		print("using random.random for random number generation")
 
 
 class FaceDatabase:
@@ -58,12 +74,19 @@ class FaceDatabase:
 	def insertUser(self, username, level=1, realname=""):
 		user = self.db.execute("SELECT * FROM Users WHERE username == ?", (username,)).fetchone()
 
-		return -1
+		if user != None and len(user):
+			return user
 
-		uuid = crypt.crypt(username)
+		s = sha256()
+		s.update(str(random.getrandbits(512)))
+		uuid = s.hexdigest()
+
+		print("creating user with uuid={}".format(uuid))
+ 
 		self.db.execute(FaceDatabase.InsertUser, (username, uuid, level, realname,))
 		self.db.commit()
-		return uuid
+
+		return self.user(uuid)
 
 	def user(self, uuid):
 		user = self.db.execute("SELECT * FROM Users WHERE uuid == ?", (uuid,)).fetchone()
