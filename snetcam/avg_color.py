@@ -14,7 +14,8 @@ def color_filter(img, color_hsv_lower, color_hsv_upper):
 
 class AverageColor(MultiprocessImageResource):
 
-	def __init__(self):
+	def __init__(self, color_filter_val=None):
+		self.color_filter_val = color_filter_val
 		MultiprocessImageResource.__init__(self, "avg_color", 2, maxQueueSize=4)
 
 	def process(self):
@@ -23,7 +24,8 @@ class AverageColor(MultiprocessImageResource):
 
 			img = dataToImage(img, True)
 
-			img = color_filter(img, (30, 22, 62), (99, 130, 196))
+			if self.color_filter_val is not None:
+				img = color_filter(img, self.color_filter_val[0], self.color_filter_val[1])
 
 			result = cv2.mean(img)
 

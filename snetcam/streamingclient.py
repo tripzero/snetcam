@@ -2,15 +2,16 @@ import cv2
 import numpy as np
 import traceback, sys
 import trollius as asyncio
+import base64
 
 from wss import Client
 
 def showImage(payload):
+	payload = base64.b64decode(payload)
 	img = np.frombuffer(payload, dtype='uint8')
 	img = cv2.imdecode(img, cv2.IMREAD_COLOR)
 	cv2.imshow("image", img)
 	k = cv2.waitKey(1)
-	print("has image!")
 
 if __name__ == '__main__':
 	import argparse
@@ -26,7 +27,7 @@ if __name__ == '__main__':
 	else:
 		print("Failed to connect")
 		
-	client.setBinaryHandler(showImage)
+	client.setTextHandler(showImage)
 
 	asyncio.get_event_loop().run_forever()
 
