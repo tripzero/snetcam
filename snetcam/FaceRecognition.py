@@ -46,7 +46,7 @@ class FaceRecognition():
 			face = frame[y:y+h, x:x+w]
 			faces.append(face)
 
-		return faces		
+		return faces
 
 	def testDetection(self):
 		cap = cv2.VideoCapture()
@@ -92,7 +92,7 @@ class FaceRecognition():
 	def createUser(self, username, userFaces, level=1, realname=""):
 		try:
 			facedb = FaceDatabase.FaceDatabase(self.db)
-			user = facedb.insertUser(username, level, realname)
+			user, exists = facedb.insertUser(username, level, realname)
 
 			for face in userFaces:
 				retval, data = cv2.imencode("foo.jpg", face)
@@ -101,7 +101,8 @@ class FaceRecognition():
 
 			facedb.db.commit()
 
-			self.users.append(user)
+			if not exists:
+				self.users.append(user)
 
 		except:
 			import sys, traceback
@@ -129,9 +130,7 @@ class FaceRecognition():
 				obj[k] = user[k];
 			obj["confidence"] = confidence
 
-			objStr = json.dumps(obj)
-			debug("recognized a face: {0}".format(objStr))
-			return objStr
+			return obj
 
 		return None
 

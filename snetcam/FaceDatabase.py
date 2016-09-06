@@ -72,10 +72,12 @@ class FaceDatabase:
 		self.db.commit()
 
 	def insertUser(self, username, level=1, realname=""):
+		"""Return user and True if exists.  user and False if user does not exist"""
+		
 		user = self.db.execute("SELECT * FROM Users WHERE username == ?", (username,)).fetchone()
 
 		if user != None and len(user):
-			return user
+			return user, True
 
 		s = sha256()
 		s.update(str(random.getrandbits(512)))
@@ -86,7 +88,7 @@ class FaceDatabase:
 		self.db.execute(FaceDatabase.InsertUser, (username, uuid, level, realname,))
 		self.db.commit()
 
-		return self.user(uuid)
+		return self.user(uuid), False
 
 	def user(self, uuid):
 		user = self.db.execute("SELECT * FROM Users WHERE uuid == ?", (uuid,)).fetchone()
