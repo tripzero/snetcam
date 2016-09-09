@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import cv2
-from avg_color import color_filter
+from .avg_color import color_filter
 import numpy as np
 
 def nothing(x):

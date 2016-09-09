@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from imageresource import *
+from .imageresource import *
 import cv2
 import trollius as asyncio
 

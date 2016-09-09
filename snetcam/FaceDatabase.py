@@ -24,17 +24,26 @@ except:
 
 class FaceDatabase:
 
-	FaceTableCreateStatement = 'CREATE TABLE Faces (id INTEGER PRIMARY KEY AUTOINCREMENT, uuid TEXT, face BLOB, age DATE DEFAULT CURRENT_DATE)'
+	FaceTableCreateStatement = 'CREATE TABLE Faces (id INTEGER PRIMARY KEY AUTOINCREMENT, uuid TEXT, face BLOB, age DATE DEFAULT CURRENT_DATE, confidence INTEGER)'
 	UserTableCreateStatement = 'CREATE TABLE Users (username TEXT, uuid TEXT, level INTEGER, realname TEXT)'
 	UserAuthTableCreateStatement = 'CREATE TABLE UserAuth (uuid TEXT, signature BLOB, bleuuid TEXT)'
+	AssociationsTableCreateStatement = 'CREATE TABLE Associations (id INTEGER PRIMARY KEY AUTOINCREMENT, uuid TEXT, associate_uuid TEXT)'
 
 	SelectUsersStatement = 'SELECT * FROM Users'
-	SelectFaceForUserStatement = 'SELECT face,age FROM Faces WHERE uuid == ?'
+	SelectFaceForUserStatement = 'SELECT id,face,age,confidence FROM Faces WHERE uuid == ?'
 	SelectSignatureStatement = 'SELECT signature FROM UserAuth WHERE uuid == ?'
+	SelectUserAssociations = 'SELECT uuid, associate_uuid FROM Associations WHERE uuid == ?'
+	UserAssociationsExists = 'SELECT uuid, associate_uuid FROM Associations WHERE uuid == ? and associate_uuid == ?'
 
 	InsertUser = 'INSERT INTO Users (username, uuid, level, realname) VALUES(?,?,?,?)'
-	InsertFace = 'INSERT INTO Faces (uuid, face) VALUES(?,?)'
+	InsertFace = 'INSERT INTO Faces (uuid, face, confidence) VALUES(?,?,?)'
 	InsertUserSignature = 'INSERT INTO UserAuth (uuid, signature) VALUES(?,?)'
+	InsertAssociation = 'INSERT INTO Associations (uuid, associate_uuid) VALUES(?,?)'
+
+	DeleteFace = 'DELETE FROM Faces WHERE id=?'
+
+	UpdateFaceUuid = "UPDATE Faces SET uuid = ? WHERE id == ?"
+	UpdateFaceConfidence = "UPDATE Faces SET confidence = ? WHERE id == ?"
 
 
 	def __init__(self, db):
@@ -51,6 +60,7 @@ class FaceDatabase:
 		self.logfile.write("{0}\n".format(msg))
 
 	def __del__(self):
+		print("closing db connection")
 		self.db.close()
 
 	def _users(self):
@@ -58,7 +68,7 @@ class FaceDatabase:
 		self.db.commit()
 		return rows
 
-	def _facesForUser(self, uuid):
+	def facesForUser(self, uuid):
 		rows = self.db.execute(FaceDatabase.SelectFaceForUserStatement,(uuid,)).fetchall()
 
 		self.db.commit()
@@ -69,11 +79,12 @@ class FaceDatabase:
 		self.db.execute(FaceDatabase.FaceTableCreateStatement)
 		self.db.execute(FaceDatabase.UserTableCreateStatement)
 		self.db.execute(FaceDatabase.UserAuthTableCreateStatement)
+		self.db.execute(FaceDatabase.AssociationsTableCreateStatement)
 		self.db.commit()
 
 	def insertUser(self, username, level=1, realname=""):
 		"""Return user and True if exists.  user and False if user does not exist"""
-		
+
 		user = self.db.execute("SELECT * FROM Users WHERE username == ?", (username,)).fetchone()
 
 		if user != None and len(user):
@@ -90,19 +101,54 @@ class FaceDatabase:
 
 		return self.user(uuid), False
 
+	def insertAssociation(self, uuid, associate_uuid):
+
+		cur = self.db.execute(FaceDatabase.UserAssociationsExists, (uuid, associate_uuid))
+
+		if cur.rowcount >= 1:
+			print("association already exists between {} and {}".format(uuid, associate_uuid))
+			return
+
+		self.db.execute(FaceDatabase.InsertAssociation, (uuid, associate_uuid))
+		self.db.commit()
+
 	def user(self, uuid):
 		user = self.db.execute("SELECT * FROM Users WHERE uuid == ?", (uuid,)).fetchone()
 
 		return user
 
-	def insertFace(self, uuid, face):
-		self.db.execute(FaceDatabase.InsertFace, (uuid, face,))
+	def user_by_username(self, username):
+		user = self.db.execute("SELECT * FROM Users WHERE username == ?", (username,)).fetchone()
+
+		return user
+
+	def set_face_user_uuid(self, face_id, new_user_uuid):
+		cur = self.db.cursor()
+		cur.execute(FaceDatabase.UpdateFaceUuid, (new_user_uuid, face_id,))
+		self.db.commit()
+
+		return cur.rowcount == 1
+
+	def set_face_confidence(self, face_id, confidence):
+		cur = self.db.cursor()
+		cur.execute(FaceDatabase.UpdateFaceConfidence, (confidence, face_id,))
+		self.db.commit()
+
+		return cur.rowcount == 1		
+
+	def insertFace(self, uuid, face, confidence):
+		self.db.execute(FaceDatabase.InsertFace, (uuid, face, confidence))
+		self.db.commit()
+
+	def deleteFace(self, id):
+		self.db.execute(FaceDatabase.DeleteFace, (id,))
+		self.db.commit()
 
 	def users(self):
 		users = self._users()
 		theUsers = []
 		for user in users:
-			theUsers.append(User(user, self._facesForUser(user['uuid'])))
+			theUsers.append(User(user, self.facesForUser(user['uuid'])))
 
 		return theUsers
 
@@ -122,8 +168,6 @@ class FaceDatabase:
 			return True
 		else:
 			return False
-
-
 
 class User:
 	userData = None

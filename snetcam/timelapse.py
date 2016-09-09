@@ -1,4 +1,4 @@
-from imageresource import MultiprocessImageResource, dataToImage, DeQueue
+from .imageresource import MultiprocessImageResource, dataToImage, DeQueue
 
 import cv2
 import numpy as np

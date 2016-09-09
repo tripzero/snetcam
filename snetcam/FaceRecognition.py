@@ -9,7 +9,7 @@ import json
 import datetime
 import time
 
-import FaceDatabase
+from .FaceDatabase import FaceDatabase
 
 logfile = open("FaceRecognition.log", "w")
 
@@ -59,7 +59,7 @@ class FaceRecognition():
 
 	def trainFromDatabase(self):
 
-		facedb = FaceDatabase.FaceDatabase(self.db)
+		facedb = FaceDatabase(self.db)
 		users = facedb.users()
 
 		if not len(users):
@@ -72,8 +72,9 @@ class FaceRecognition():
 		self.users = []
 		for user in users:
 			self.users.append(user.userData)
+			
 			if not len(user.faceData):
-				raise Exception("database seems borked.  We have users without faces")
+				continue
 
 			for faceData in user.faceData:
 				data = base64.b64decode(faceData['face'])
@@ -85,31 +86,33 @@ class FaceRecognition():
 
 		print("we have {} faces and {} ids".format(len(faces), len(ids)))
 
-		self.recognizer.train(np.asarray(faces), np.asarray(ids, dtype=np.int32))
+
+		if len(faces):
+			self.recognizer.train(np.asarray(faces), np.asarray(ids, dtype=np.int32))
 
 		return len(self.users), len(faces)
 
+	def encodeImage(self, img):
+		retval, data = cv2.imencode("foo.jpg", img)
+		return base64.b64encode(data)
+
+
 	def createUser(self, username, userFaces, level=1, realname=""):
-		try:
-			facedb = FaceDatabase.FaceDatabase(self.db)
-			user, exists = facedb.insertUser(username, level, realname)
+		facedb = FaceDatabase(self.db)
+		user, exists = facedb.insertUser(username, level, realname)
 
-			for face in userFaces:
-				retval, data = cv2.imencode("foo.jpg", face)
-				if retval:
-					facedb.insertFace(user['uuid'], base64.b64encode(data))
+		for face, confidence in userFaces:
+			if not face:
+				continue
 
-			facedb.db.commit()
+			data = self.encodeImage(face)
+			if retval:
+				facedb.insertFace(user['uuid'], data, confidence)
 
-			if not exists:
-				self.users.append(user)
+		facedb.db.commit()
 
-		except:
-			import sys, traceback
-			exc_type, exc_value, exc_traceback = sys.exc_info()
-			traceback.print_tb(exc_traceback, limit=1, file=sys.stdout)
-			traceback.print_exception(exc_type, exc_value, exc_traceback,
-						limit=6, file=sys.stdout)
+		if not exists:
+			self.users.append(user)
 
 		return user
 
@@ -135,7 +138,7 @@ class FaceRecognition():
 		return None
 
 	def getUsers(self, filter=None):
-		facedb = FaceDatabase.FaceDatabase(self.db)
+		facedb = FaceDatabase(self.db)
 		usersArray = []
 		for user in self.users:
 			if filter and user["name"] != filter:
@@ -143,7 +146,7 @@ class FaceRecognition():
 			obj = {}
 			for k in user.keys():
 				obj[k] = user[k];
-			faces = facedb._facesForUser(user['uuid'])
+			faces = facedb.facesForUser(user['uuid'])
 			if len(faces):
 				obj["face"] = str(faces[0]['face'])
 			usersArray.append(obj)
@@ -151,5 +154,11 @@ class FaceRecognition():
 		return usersArray
 
 	def getUser(self, uuid):
-		facedb = FaceDatabase.FaceDatabase(self.db)
+		facedb = FaceDatabase(self.db)
 		return facedb.user(uuid)
+
+
+	def addFaceToUser(self, uuid, face, confidence):
+		face_data = self.encodeImage(face)
+		facedb = FaceDatabase(self.db)
+		facedb.insertFace(uuid, face_data, confidence)

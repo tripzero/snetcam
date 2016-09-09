@@ -6,7 +6,13 @@ from collections import deque
 import trollius as asyncio
 import sys, os, traceback
 from multiprocessing import Process, Queue, Pool
-from Queue import Empty
+
+is_py2 = sys.version[0] == '2'
+if is_py2:
+    from Queue import Empty
+else:
+    from queue import Empty
+
 
 def MINS(mins):
 	return mins * 60

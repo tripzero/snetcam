@@ -1,5 +1,5 @@
 from wss import Server
-from FaceRecognition import FaceRecognition
+from .FaceRecognition import FaceRecognition
 import json
 import trollius as asyncio
 from base64 import b64decode, b64encode
@@ -60,6 +60,14 @@ class Signals:
 		msg = {"signal" : "list_users", "users" : users }
 		return json.dumps(msg)
 
+	@staticmethod
+	def error(msg):
+		msg = {"signal" : "error", "message" : msg}
+		return json.dumps(msg)
+
+class ErrorMessages:
+
+	InvalidCamera = "Invalid camera selected"
 
 class RecognitionServer(Server):
 
@@ -121,26 +129,28 @@ class RecognitionServer(Server):
 	def process(self, img, camera_name):
 		
 		faces = self.recognizer.detectFaces(img)
-		print("number of faces in image: {}".format(len(faces)))
-		print("number of users: {}".format(len(self.recognizer.users)))
 
 		if not len(self.recognizer.users) and len(faces):
-			new_user = self.recognizer.createUser("the_unknown_face", faces)
-			return	
+			return
 
 		for face in faces:
 			try:
 				self.face_detected(face, camera_name)
 				user = self.recognizer.recognize(face)
+
+				if not user:
+					return
+
+				confidence = user["confidence"]
+				uuid = user["uuid"]
+
 				print("user recognized: {}".format(user))
+				print("confidence: {}".format(confidence))
 
-				print("confidence: {}".format(user["confidence"]))
-
-				if user["confidence"] <= 10:
-					"The could be a new user.  Create unknown user for this face for future identification."
-					self.recognizer.createUser("the_unknown_face", [face])
-
-				else:
+				if confidence < 700:
+					self.recognizer.addFaceToUser(uuid, face, confidence)
+					
+				elif confidence > 800:
 					self.face_recognized(face, user, camera_name)
 
 			except:
@@ -169,6 +179,17 @@ class RecognitionServer(Server):
 			return
 
 		camera_name = msg["camera"]
+
+		valid_camera = False
+
+		for camera in self.cameras:
+			if camera.name == camera_name:
+				valid_camera = True
+				break
+
+		if not valid_camera:
+			fromClient.sendMessage(Signals.error(ErrorMessages.InvalidCamera), False)
+			return
 
 		if not camera_name in self.camera_clients.keys():
 			self.camera_clients[camera_name] = []
@@ -239,24 +260,3 @@ class WssCamera(CameraBase):
 			self.imgQueue.put_nowait(img)
 		except asyncio.QueueFull:
 			pass
-
-if __name__ == "__main__":
-	import argparse
-	parser = argparse.ArgumentParser()
-	parser.add_argument('address', help="address", default="localhost", nargs="?")
-	parser.add_argument('port', help="port", default=9000, nargs="?")
-	parser.add_argument('--ssl', dest="usessl", help="use ssl.", action='store_true')
-	parser.add_argument('--local', help="use local camera.", action='store_true')
-	args = parser.parse_args()
-
-	cam = None
-
-	if args.local:
-		cam = LocalCamera("test_cam")
-
-	else:
-		cam = WssCamera("wss_test_cam", args.address, args.port, args.usessl)
-
-	serv = RecognitionServer([cam])
-
-	asyncio.get_event_loop().run_forever()

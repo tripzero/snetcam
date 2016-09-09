@@ -1,11 +1,12 @@
 #recognitionclient.py
 
 import trollius as asyncio
+
 import json
 
 from wss import Client
 
-from recognitionserver import Messages
+from .recognitionserver import Messages
 
 class C:
 
@@ -33,22 +34,29 @@ def cls(c):
 
 class RecognitionClient:
 		
-	def __init__(self, camera_name, address="localhost", port=9004, usessl=False):
+	def __init__(self, camera_name, address="localhost", port=9004, usessl=False, loop=None):
 
 		self.msgRecieved = {}
 		self.camera_name = camera_name
-		
-		self.client = Client(retry=True)
-		self.client.connectTo(address, port, useSsl=usessl)
+		self.address = address
+		self.port = port
+		self.usessl = usessl
+
+		self.client = Client(retry=True, loop=loop)
 		
 		self.client.setTextHandler(self.txtHndler)
 		self.client.setOpenHandler(self.connection_opened)
 
 		self.openHandler = None
 
+	def connect(self):
+		self.client.connectTo(self.address, self.port, useSsl=self.usessl)
+
 	def connection_opened(self):
 		try:
-			self.select_camera(self.camera_name)
+			if self.camera_name:
+				self.select_camera(self.camera_name)
+
 			if self.openHandler:
 				self.openHandler()
 
@@ -65,8 +73,8 @@ class RecognitionClient:
 	def select_camera(self, camera_name):	
 		self.client.sendTextMsg(Messages.select_camera(camera_name))
 
-	def list_users(self):
-		self.client.sendTextMsg(Messages.list_users())
+	def list_users(self, filter=None):
+		self.client.sendTextMsg(Messages.list_users(filter))
 		
 	def txtHndler(self, data):
 
@@ -79,7 +87,6 @@ class RecognitionClient:
 		msg_class = data_obj["signal"]
 		
 		if msg_class in C.class_map:
-			print ("trace")
 			c = C.class_map[msg_class]
 			msg = c(data_obj)
 			
@@ -93,6 +100,8 @@ class RecognitionClient:
 class MessageBase(object):
 
 	def __init__(self, data_obj):
+		self.raw = data_obj
+		
 		for key in data_obj.keys():
 			if hasattr(self, key):
 				setattr(self, key, data_obj[key])
@@ -110,7 +119,7 @@ class FaceDetectedSignal(MessageBase):
 	"""
 	
 	def __init__(self, data_obj):
-		self.image = None
+		self.img = None
 
 		MessageBase.__init__(self, data_obj)
 
@@ -154,34 +163,16 @@ class ListUsersSignal(MessageBase):
 
 		MessageBase.__init__(self, data_obj)
 
-if __name__ == "__main__":
-	import argparse
-	parser = argparse.ArgumentParser()
-	parser.add_argument('address', help="address", default="localhost", nargs="?")
-	parser.add_argument('port', help="port", default=9004, nargs="?")
-	parser.add_argument('--ssl', dest="usessl", help="use ssl.", action='store_true')
-	parser.add_argument('--camera_name', help="name of camera")
-	args = parser.parse_args()
+@C.message_handler("error")
+class ErrorSignal(MessageBase):
+	"""
+	error
 
-	client = RecognitionClient(args.camera_name, args.address, args.port, args.usessl)
-	
-	def connected():
-		client.list_users()
+	example:
+	{"signal" : "error", "message" : "fail"}
+	"""
 
-	client.setOpenHandler(connected)
+	def __init__(self, data_obj):
+		self.message = ""
+		MessageBase.__init__(self, data_obj)
 
-	def face_recognized(msg):
-		print("face_recognized received: {}".format(msg.username))
-
-	def face_detected(msg):
-		print("face_recognized received: {}")
-
-	def list_users(msg):
-		for user in msg.users:
-			print("user: {}".format(user["username"]))
-
-	client.setMessageReceived(FaceRecognizedSignal, face_recognized)
-	client.setMessageReceived(FaceDetectedSignal, face_detected)
-	client.setMessageReceived(ListUsersSignal, list_users)
-
-	asyncio.get_event_loop().run_forever()
