@@ -6,7 +6,7 @@ import json
 
 from wss import Client
 
-from .recognitionserver import Messages
+from .recognitionprotocol import Messages
 
 class C:
 
@@ -101,7 +101,7 @@ class MessageBase(object):
 
 	def __init__(self, data_obj):
 		self.raw = data_obj
-		
+
 		for key in data_obj.keys():
 			if hasattr(self, key):
 				setattr(self, key, data_obj[key])
