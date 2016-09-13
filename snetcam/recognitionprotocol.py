@@ -1,3 +1,7 @@
+import json
+from base64 import b64decode, b64encode
+import numpy as np
+
 class Messages:
 
 	@staticmethod
@@ -14,6 +18,7 @@ class Signals:
 	
 	@staticmethod
 	def encode_img(img):
+		import cv2
 		success, data = cv2.imencode('.jpg', img)
 
 		if not success:

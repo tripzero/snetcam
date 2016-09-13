@@ -110,10 +110,19 @@ class RecognitionServer(Server):
 	def onMessage(self, msg, fromClient):
 		print("message received!!!")
 
-		msg = json.loads(msg)
+		try:
+			msg = json.loads(msg)
 
-		if "method" in msg.keys():
-			self.hndl_method(msg, fromClient)
+			if "method" in msg.keys():
+				self.hndl_method(msg, fromClient)
+		except:
+
+			print ("message: {}".format(msg))
+			import sys, traceback
+			exc_type, exc_value, exc_traceback = sys.exc_info()
+			traceback.print_tb(exc_traceback, limit=1, file=sys.stdout)
+			traceback.print_exception(exc_type, exc_value, exc_traceback,
+							limit=6, file=sys.stdout)
 
 	def hndl_method(self, msg, fromClient):
 		method = msg["method"]
