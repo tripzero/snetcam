@@ -21,10 +21,15 @@ class RecognitionServer(Server):
 	def __init__(self, cameras=[], port=9004, dbfile="faces.db"):
 		
 		Server.__init__(self, port=port, usessl=False)
-
+		
+		self.last_user_uuid = ""
+		
 		self.camera_clients = {}
 		self.recognizer = FaceRecognition(db=dbfile)
+
 		users, faces = self.recognizer.trainFromDatabase()
+
+		self.unknown_user = self.recognizer.createUser("unknown_user", [(None,None)])
 
 		print("we have {} users and {} faces".format(users, faces))
 
@@ -34,9 +39,14 @@ class RecognitionServer(Server):
 		self.method_handlers = {}
 		self.method_handlers["list_users"] = self.list_users
 		self.method_handlers["select_camera"] = self.select_camera
+		self.method_handlers["list_users_with_level"] = self.list_users_with_level
+		self.method_handlers["add_association"] = self.add_association
+		self.method_handlers["retrain"] = self.recognizer.trainFromDatabase
 
 		asyncio.get_event_loop().create_task(self.poll())
 
+	def reset_last_uuid(self):
+		 self.last_user_uuid=""
 	
 	def send_all(self, camera_name, msg):
 		for client in self.camera_clients[camera_name]:
@@ -50,11 +60,11 @@ class RecognitionServer(Server):
 		
 		self.send_all(camera_name, msg)
 
-	def face_recognized(self, img, user, camera_name):
+	def face_recognized(self, img, user, camera_name, confidence):
 		if not camera_name in self.camera_clients:
 			return
 		
-		msg = Signals.face_recognized(user, img)
+		msg = Signals.face_recognized(user, img, confidence)
 
 		self.send_all(camera_name, msg)
 
@@ -91,14 +101,23 @@ class RecognitionServer(Server):
 				confidence = user["confidence"]
 				uuid = user["uuid"]
 
-				print("user recognized: {}".format(user))
+				print("user recognized: {}".format(user["username"]))
 				print("confidence: {}".format(confidence))
 
-				if confidence < 700:
-					self.recognizer.addFaceToUser(uuid, face, confidence)
+				if confidence > 1000:
+					if self.last_user_uuid != uuid:
+						self.last_user_uuid = uuid
+						self.recognizer.addFaceToUser(self.unknown_user["uuid"], face, confidence)
+						asyncio.get_event_loop().call_later(30, self.reset_last_uuid)
 					
-				elif confidence > 800:
-					self.face_recognized(face, user, camera_name)
+				if confidence < 500 and uuid != self.unknown_user["uuid"]:
+					print("confidence is good.  Sending face_recognized signal")
+					self.face_recognized(face, user, camera_name, confidence)
+
+				if confidence < 500:
+					if self.last_user_uuid != uuid:
+						self.last_user_uuid = uuid
+						self.recognizer.addFaceToUser(uuid, face, confidence)
 
 			except:
 				import sys, traceback
@@ -115,8 +134,10 @@ class RecognitionServer(Server):
 
 			if "method" in msg.keys():
 				self.hndl_method(msg, fromClient)
-		except:
+			else:
+				print("unhandled message: {}".format(msg))
 
+		except:
 			print ("message: {}".format(msg))
 			import sys, traceback
 			exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -126,8 +147,11 @@ class RecognitionServer(Server):
 
 	def hndl_method(self, msg, fromClient):
 		method = msg["method"]
+
 		if method in self.method_handlers:
 			self.method_handlers[method](msg, fromClient)
+		else:
+			print("method not handled: {}".format(method))
 
 	def select_camera(self, msg, fromClient):
 		if not "camera" in msg:
@@ -160,7 +184,21 @@ class RecognitionServer(Server):
 		reply = Signals.list_users(self.recognizer.getUsers(filter))
 
 		fromClient.sendMessage(reply, False)
-		
+
+	def list_users_with_level(self, msg, fromClient):
+		level = msg["level"]
+		users = self.recognizer.getUsers(level=level)
+
+		print("replying to list_users_with level with ({}) users".format(len(users)))
+
+		reply = Signals.list_users_with_level(users)
+
+		fromClient.sendMessage(reply, False)
+
+	def add_association(self, msg, fromClient):
+		uuid = msg["uuid"]
+		associate_uuid = msg["associate_uuid"]
+		self.recognizer.addAssociation(uuid, associate_uuid)
 
 
 class LocalCamera(CameraBase):

@@ -30,9 +30,10 @@ class FaceDatabase:
 	AssociationsTableCreateStatement = 'CREATE TABLE Associations (id INTEGER PRIMARY KEY AUTOINCREMENT, uuid TEXT, associate_uuid TEXT)'
 
 	SelectUsersStatement = 'SELECT * FROM Users'
+	SelectUsersWithLevel = 'SELECT * FROM Users WHERE level >= ?'
 	SelectFaceForUserStatement = 'SELECT id,face,age,confidence FROM Faces WHERE uuid == ?'
 	SelectSignatureStatement = 'SELECT signature FROM UserAuth WHERE uuid == ?'
-	SelectUserAssociations = 'SELECT uuid, associate_uuid FROM Associations WHERE uuid == ?'
+	SelectUserAssociations = 'SELECT associate_uuid FROM Associations WHERE uuid == ?'
 	UserAssociationsExists = 'SELECT uuid, associate_uuid FROM Associations WHERE uuid == ? and associate_uuid == ?'
 
 	InsertUser = 'INSERT INTO Users (username, uuid, level, realname) VALUES(?,?,?,?)'
@@ -41,9 +42,11 @@ class FaceDatabase:
 	InsertAssociation = 'INSERT INTO Associations (uuid, associate_uuid) VALUES(?,?)'
 
 	DeleteFace = 'DELETE FROM Faces WHERE id=?'
+	DeleteAssociation = "DELETE FROM Associations WHERE uuid=? AND associate_uuid=?"
 
 	UpdateFaceUuid = "UPDATE Faces SET uuid = ? WHERE id == ?"
 	UpdateFaceConfidence = "UPDATE Faces SET confidence = ? WHERE id == ?"
+	UpdateUserLevel = "UPDATE Users SET level = ? WHERE uuid == ?"
 
 
 	def __init__(self, db):
@@ -54,6 +57,7 @@ class FaceDatabase:
 		self.db.row_factory = sqlite3.Row
 		if create:
 			self.createDatabase()
+
 		self.logfile = open("FaceDatabase.log", "w")
 
 	def debug(self, msg):
@@ -112,6 +116,21 @@ class FaceDatabase:
 		self.db.execute(FaceDatabase.InsertAssociation, (uuid, associate_uuid))
 		self.db.commit()
 
+	def associations(self, uuid):
+		cur = self.db.execute(FaceDatabase.SelectUserAssociations, (uuid,))
+
+		rows = cur.fetchall()
+
+		assc = []
+		for row in rows:
+			assc.append(row["associate_uuid"])
+
+		return assc
+
+	def removeAssociation(self, uuid, associate_uuid):
+		return self.db.execute(FaceDatabase.DeleteAssociation, uuid, associate_uuid).rowcount >= 1
+
+
 	def user(self, uuid):
 		user = self.db.execute("SELECT * FROM Users WHERE uuid == ?", (uuid,)).fetchone()
 
@@ -134,7 +153,14 @@ class FaceDatabase:
 		cur.execute(FaceDatabase.UpdateFaceConfidence, (confidence, face_id,))
 		self.db.commit()
 
-		return cur.rowcount == 1		
+		return cur.rowcount == 1
+
+	def set_user_level(self, uuid, level):
+		cur = self.db.cursor()
+		cur.execute(FaceDatabase.UpdateUserLevel, (level, uuid))
+		self.db.commit()
+
+		return cur.rowcount == 1
 
 	def insertFace(self, uuid, face, confidence):
 		self.db.execute(FaceDatabase.InsertFace, (uuid, face, confidence))
@@ -148,9 +174,14 @@ class FaceDatabase:
 		users = self._users()
 		theUsers = []
 		for user in users:
-			theUsers.append(User(user, self.facesForUser(user['uuid'])))
+			uuid = str(user['uuid'])
+			print("uuid={}".format(uuid))
+			theUsers.append(User(user, self.facesForUser(uuid), self.associations(uuid)))
 
 		return theUsers
+
+	def usersWithLevel(self, level):
+		return self.db.execute(SelectUsersWithLevel, (level)).fetchall()
 
 	def signature(self, uuid, sig = None):
 		result = self.db.execute(FaceDatabase.SelectSignatureStatement, (uuid,)).fetchone()
@@ -172,10 +203,12 @@ class FaceDatabase:
 class User:
 	userData = None
 	faceData = None
+	associations = []
 
-	def __init__(self, user, faces):
+	def __init__(self, user, faces, associations):
 		self.faceData = faces
 		self.userData = user
+		self.associations = associations
 
 
 

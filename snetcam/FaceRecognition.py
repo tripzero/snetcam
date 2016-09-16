@@ -20,9 +20,8 @@ def debug(msg):
 debug("Starting log: {0}".format(datetime.datetime.now()))
 
 class FaceRecognition():
-	trainingSize = (40, 30)
-
 	def __init__(self, useOpenCL = False, db = "myfaces.db"):
+		self.trainingSize = (100, 75)
 		debug("instantiating FaceRecognition")
 		self.db = db
 		self.users = []
@@ -57,7 +56,7 @@ class FaceRecognition():
 			if cv2.waitKey(1) & 0xFF == ord('q'):
 				break
 
-	def trainFromDatabase(self):
+	def trainFromDatabase(self, filter_threshold=3000):
 
 		facedb = FaceDatabase(self.db)
 		users = facedb.users()
@@ -70,6 +69,7 @@ class FaceRecognition():
 		faces = []
 		ids = []
 		self.users = []
+
 		for user in users:
 			self.users.append(user.userData)
 			
@@ -77,6 +77,8 @@ class FaceRecognition():
 				continue
 
 			for faceData in user.faceData:
+				if faceData["confidence"] > filter_threshold:
+					continue
 				data = base64.b64decode(faceData['face'])
 				face = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_GRAYSCALE)
 				face = cv2.resize(face, self.trainingSize)
@@ -116,6 +118,13 @@ class FaceRecognition():
 
 		return user
 
+	def copyRow(self, row):
+		obj = {}
+		for key in row.keys():
+			obj[key] = row[key]
+
+		return obj
+
 	def recognize(self, face):
 
 		if not len(self.users):
@@ -128,20 +137,18 @@ class FaceRecognition():
 		user = None
 		if faceId != -1:
 			user = self.users[faceId]
-			obj = {}
-			for k in user.keys():
-				obj[k] = user[k];
+			obj = self.getUsers(uuid = user["uuid"])[0]
 			obj["confidence"] = confidence
 
 			return obj
 
 		return None
 
-	def getUsers(self, filter=None):
+	def getUsers(self, filter=None, level=None, uuid=None):
 		facedb = FaceDatabase(self.db)
 		usersArray = []
 		for user in self.users:
-			if filter and user["name"] != filter:
+			if (filter and user["name"] != filter) or (level and user["level"] < level) or (uuid and user["uuid"] == uuid):
 				continue
 			obj = {}
 			for k in user.keys():
@@ -149,16 +156,24 @@ class FaceRecognition():
 			faces = facedb.facesForUser(user['uuid'])
 			if len(faces):
 				obj["face"] = str(faces[0]['face'])
+			associations = facedb.associations(user['uuid'])
+			obj["associations"] = associations
+
 			usersArray.append(obj)
 		debug("returning array of json strings of length: " + str(len(usersArray)))
 		return usersArray
 
 	def getUser(self, uuid):
 		facedb = FaceDatabase(self.db)
-		return facedb.user(uuid)
+		return self.copyRow(facedb.user(uuid))
 
 
 	def addFaceToUser(self, uuid, face, confidence):
 		face_data = self.encodeImage(face)
 		facedb = FaceDatabase(self.db)
 		facedb.insertFace(uuid, face_data, confidence)
+
+	def addAssociation(self, uuid, associate_uuid):
+		facedb = FaceDatabase(self.db)
+		facedb.insertAssociation(uuid, associate_uuid)
+

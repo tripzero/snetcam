@@ -35,7 +35,7 @@ def cls(c):
 class RecognitionClient:
 		
 	def __init__(self, camera_name, address="localhost", port=9004, usessl=False, loop=None):
-
+		self.debug = False
 		self.msgRecieved = {}
 		self.camera_name = camera_name
 		self.address = address
@@ -51,6 +51,10 @@ class RecognitionClient:
 
 	def connect(self):
 		self.client.connectTo(self.address, self.port, useSsl=self.usessl)
+
+	def debug_msg(self, msg):
+		if self.debug == True:
+			print("debug: " + msg)
 
 	def connection_opened(self):
 		try:
@@ -75,13 +79,19 @@ class RecognitionClient:
 
 	def list_users(self, filter=None):
 		self.client.sendTextMsg(Messages.list_users(filter))
+
+	def list_users_with_level(self, level):
+		self.client.sendTextMsg(Messages.list_users_with_level(level))
 		
 	def txtHndler(self, data):
+		self.debug_msg("Trying to parse text message: {}".format(data))
 
 		data_obj = json.loads(data)
 
 		if "signal" in data_obj:
 			self.hndlSignal(data_obj)
+		else:
+			self.debug_msg("unhandled message: {}".format(data))
 
 	def hndlSignal(self, data_obj):
 		msg_class = data_obj["signal"]
@@ -92,10 +102,13 @@ class RecognitionClient:
 			
 			if c in self.msgRecieved:
 				self.msgRecieved[c](msg)
+			else:
+				self.debug_msg("signal no handler for signal {}".format(c))
+		else:
+			self.debug_msg("no class defined to parse signal {}".format(msg_class))
 
 	def setMessageReceived(self, msg_type, callback):
 		self.msgRecieved[msg_type] = callback
-
 
 class MessageBase(object):
 
@@ -137,6 +150,8 @@ class FaceRecognizedSignal(MessageBase):
 		"username" : "unknown",
 		"uuid" : "1235ABCD..."
 		"realname" : "Unknown User",
+		"confidence" : 1022.321,
+		"associations" : [],
 		"img" : "..."
 	}
 
@@ -146,6 +161,8 @@ class FaceRecognizedSignal(MessageBase):
 		self.uuid = None
 		self.realname = None
 		self.img = None
+		self.confidence = None
+		self.associations = None
 
 		MessageBase.__init__(self, data_obj)
 
@@ -156,6 +173,20 @@ class ListUsersSignal(MessageBase):
 
 	example:
 	{ "signal" : "list_users", "users" : [...]}
+	"""
+
+	def __init__(self, data_obj):
+		self.users = []
+
+		MessageBase.__init__(self, data_obj)
+
+@C.message_handler("list_users_with_level")
+class ListUsersWithLevelSignal(MessageBase):
+	"""
+	list_users
+
+	example:
+	{ "signal" : "list_users_with_level", "users" : [...]}
 	"""
 
 	def __init__(self, data_obj):
