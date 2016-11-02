@@ -1,5 +1,6 @@
 import trollius as asyncio
-from snetcam.recognitionserver import RecognitionServer, WssCamera
+from snetcam.recognitionserver2 import RecognitionServer
+import rospy
 
 if __name__ == "__main__":
 	import argparse
@@ -10,14 +11,15 @@ if __name__ == "__main__":
 	parser.add_argument('--local', help="use local camera.", action='store_true')
 	args = parser.parse_args()
 
-	cam = None
+	rospy.init_node('recognition_server', disable_signals=False)
 
-	if args.local:
-		cam = LocalCamera("test_cam")
+	serv = RecognitionServer()
 
-	else:
-		cam = WssCamera("wss_test_cam", args.address, args.port, args.usessl)
+	print("{} users".format(len(serv.recognizer.users)))
 
-	serv = RecognitionServer([cam])
+	for user in serv.recognizer.users:
+		print("username: {}, id: {}".format(user.username, user.uuid))
+
+	asyncio.get_event_loop().call_later(60 * 5, serv.save_recognition_db)
 
 	asyncio.get_event_loop().run_forever()
