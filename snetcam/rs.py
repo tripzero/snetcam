@@ -20,6 +20,4 @@ if __name__ == "__main__":
 	for user in serv.recognizer.users:
 		print("username: {}, id: {}".format(user.username, user.uuid))
 
-	asyncio.get_event_loop().call_later(60 * 5, serv.save_recognition_db)
-
 	asyncio.get_event_loop().run_forever()
