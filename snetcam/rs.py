@@ -5,15 +5,13 @@ import rospy
 if __name__ == "__main__":
 	import argparse
 	parser = argparse.ArgumentParser()
-	parser.add_argument('address', help="address", default="localhost", nargs="?")
-	parser.add_argument('port', help="port", default=9000, nargs="?")
-	parser.add_argument('--ssl', dest="usessl", help="use ssl.", action='store_true')
-	parser.add_argument('--local', help="use local camera.", action='store_true')
+	parser.add_argument('--user_file', help="user_file", default="users.json", nargs="?")
+	parser.add_argument('--recognition_db', help="recognition_db", default="recognition.db", nargs="?")
 	args = parser.parse_args()
 
 	rospy.init_node('recognition_server', disable_signals=False)
 
-	serv = RecognitionServer()
+	serv = RecognitionServer(users_file=args.user_file, recognition_db=recognition_db)
 
 	print("{} users".format(len(serv.recognizer.users)))
 
