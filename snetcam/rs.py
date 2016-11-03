@@ -11,7 +11,9 @@ if __name__ == "__main__":
 
 	rospy.init_node('recognition_server', disable_signals=False)
 
-	serv = RecognitionServer(users_file=args.user_file, recognition_db=recognition_db)
+	serv = RecognitionServer(users_file=args.user_file, recognition_db=args.recognition_db)
+
+	serv.load_recognition_db()
 
 	print("{} users".format(len(serv.recognizer.users)))
 

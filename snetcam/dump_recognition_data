@@ -1,0 +1,17 @@
+#!/usr/bin/env python
+
+import trollius as asyncio
+from snetcam.recognitionserver2 import RecognitionServer
+import rospy
+
+if __name__ == "__main__":
+	import argparse
+	parser = argparse.ArgumentParser()
+	parser.add_argument('output_file', help="output_file", default="output.db", nargs="?")
+	args = parser.parse_args()
+
+	rospy.init_node('dumper', disable_signals=False)
+
+	serv = RecognitionServer(recognition_db=args.output_file)
+
+	serv.save_recognition_db()

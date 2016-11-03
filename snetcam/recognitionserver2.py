@@ -30,8 +30,6 @@ class RecognitionServer(Server):
 		self.camera_clients = []
 		self.recognizer = Recognizer(users_file)
 
-		self.load_recognition_db()
-
 		self.cameras = cameras
 		self.start()
 
