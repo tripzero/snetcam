@@ -195,7 +195,7 @@ class RecognitionServer(Server):
 		reply_user_list = []
 
 		for user in users:
-			if user.level == level:
+			if user.level >= level:
 				reply_user_list.append(user.to_json())
 
 		print("replying to list_users_with level with ({}) users".format(len(reply_user_list)))
