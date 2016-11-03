@@ -19,14 +19,14 @@ class CameraBase:
 class RecognitionServer(Server):
 
 	def __init__(self, cameras=[], port=9004, users_file="users.json", recognition_db="recognition.db"):
-		
+
 		Server.__init__(self, port=port, usessl=False)
 
 		self.recognition_db = recognition_db
-		
+
 		self.last_user_uuid = ""
 		self.last_len_persons_detected = 0
-		
+
 		self.camera_clients = []
 		self.recognizer = Recognizer(users_file)
 

@@ -12,6 +12,7 @@ if __name__ == "__main__":
 
 	rospy.init_node('dumper', disable_signals=False)
 
-	serv = RecognitionServer(recognition_db=args.output_file)
+	serv = RecognitionServer(port=60009, recognition_db=args.output_file)
 
 	serv.save_recognition_db()
+	rospy.signal_shutdown()
