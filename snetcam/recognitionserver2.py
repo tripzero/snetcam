@@ -25,7 +25,8 @@ class RecognitionServer(Server):
 		self.recognition_db = recognition_db
 
 		self.last_user_uuid = ""
-		self.last_len_persons_detected = 0
+		self.last_len_persons_detected = -1
+		self.last_len_users = -1
 
 		self.camera_clients = []
 		self.recognizer = Recognizer(users_file)
@@ -82,8 +83,17 @@ class RecognitionServer(Server):
 		
 		self.send_all(msg)
 
+	def persons_detected(self, persons, users):
+		msg = Signals.persons_detected(persons, users)
+		self.send_all(msg)
+
 	def face_recognized(self, user, img, confidence):
 		msg = Signals.face_recognized(user, img, confidence)
+
+		self.send_all(msg)
+
+	def users_recognized(self, users):
+		msg = Signals.users_recognized(users)
 
 		self.send_all(msg)
 
@@ -110,12 +120,10 @@ class RecognitionServer(Server):
 
 	def process(self, persons):
 		
+		users_recognized = []
+
 		for person in persons:
 			try:
-				if self.last_len_persons_detected != len(persons):
-					self.last_len_persons_detected = len(persons)
-					self.face_detected(person)
-
 				user = self.recognizer.recognize(person.person_id.tracking_id)
 
 				if not user or user.status > 1:
@@ -136,6 +144,7 @@ class RecognitionServer(Server):
 
 				if confidence > 50:
 					print("confidence is good.  Sending face_recognized signal")
+					users_recognized.append(userdata)
 					self.face_recognized(userdata, None, confidence)
 
 			except:
@@ -144,6 +153,13 @@ class RecognitionServer(Server):
 				traceback.print_tb(exc_traceback, limit=1, file=sys.stdout)
 				traceback.print_exception(exc_type, exc_value, exc_traceback,
 							limit=6, file=sys.stdout)
+
+
+		if len(persons) != self.last_len_persons_detected or self.last_len_users != len(users_recognized):
+			self.last_len_persons_detected = len(persons)
+			self.last_len_users = len(users_recognized)
+			
+			self.persons_detected(persons, users_recognized)
 
 	def onMessage(self, msg, fromClient):
 		print("message received!!!")

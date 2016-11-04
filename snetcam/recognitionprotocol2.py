@@ -54,6 +54,27 @@ class Signals:
 		return json.dumps(msg)
 
 	@staticmethod
+	def persons_detected(persons, users):
+		tracking_ids = []
+
+		for p in persons:
+			tracking_ids.append(p.tracking_id)
+
+		users_n = []
+
+		for u in users:
+			users_n.append(u.to_json())
+
+		msg = { "signal" : persons_detected,
+			"num_persons" : len(persons), 
+			"tracking_ids": tracking_ids,
+			"num_users" : len(users_n),
+			"users" : users_n
+		}
+
+		return json.dumps(msg)
+
+	@staticmethod
 	def face_recognized(user, img, confidence):
 		#data = Signals.encode_img(img)
 		data = None

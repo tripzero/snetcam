@@ -207,3 +207,15 @@ class ErrorSignal(MessageBase):
 		self.message = ""
 		MessageBase.__init__(self, data_obj)
 
+
+@C.message_handler("persons_detected")
+class PersonsDetectedSignal(MessageBase):
+
+	def __init__(self, data_obj):
+		self.num_persons = 0
+		self.tracking_ids = []
+		self.num_users = 0
+		self.users = []
+
+		MessageBase.__init__(self, data_obj)
+
