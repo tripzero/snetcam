@@ -30,7 +30,7 @@ class Messages:
 		return json.dumps(msg)
 
 class Signals:
-	
+
 	@staticmethod
 	def encode_img(img):
 
@@ -58,15 +58,15 @@ class Signals:
 		tracking_ids = []
 
 		for p in persons:
-			tracking_ids.append(p.tracking_id)
+			tracking_ids.append(p.person_id.tracking_id)
 
 		users_n = []
 
 		for u in users:
 			users_n.append(u.to_json())
 
-		msg = { "signal" : persons_detected,
-			"num_persons" : len(persons), 
+		msg = { "signal" : "persons_detected",
+			"num_persons" : len(persons),
 			"tracking_ids": tracking_ids,
 			"num_users" : len(users_n),
 			"users" : users_n
@@ -82,7 +82,7 @@ class Signals:
 		msg["signal"] = "face_recognized"
 		msg["img"] = data
 		msg["confidence"] = confidence
-		
+
 		return json.dumps(msg)
 
 	@staticmethod

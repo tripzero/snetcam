@@ -45,7 +45,7 @@ class RecognitionServer(Server):
 
 	def save_recognition_db(self):
 		print("trying to save recognition db...")
-		try: 
+		try:
 			with open(self.recognition_db, "w+") as db:
 				data = self.recognizer.serialize()
 
@@ -73,14 +73,14 @@ class RecognitionServer(Server):
 
 	def reset_last_uuid(self):
 		 self.last_user_uuid=""
-	
+
 	def send_all(self, msg):
 		for client in self.camera_clients:
 			client.sendMessage(msg, False)
 
-	def face_detected(self, person):		
+	def face_detected(self, person):
 		msg = Signals.face_detected(None)
-		
+
 		self.send_all(msg)
 
 	def persons_detected(self, persons, users):
@@ -101,12 +101,10 @@ class RecognitionServer(Server):
 	@asyncio.coroutine
 	def poll(self):
 		while True:
-			try: 
+			try:
 				persons = self.recognizer.detect_persons()
 
-				if len(persons):
-					print("persons? {}".format(len(persons)))
-					self.process(persons)
+				self.process(persons)
 
 			except:
 				print("crashed while trying to poll recognizer...")
@@ -119,7 +117,7 @@ class RecognitionServer(Server):
 
 
 	def process(self, persons):
-		
+
 		users_recognized = []
 
 		for person in persons:
@@ -145,7 +143,6 @@ class RecognitionServer(Server):
 				if confidence > 50:
 					print("confidence is good.  Sending face_recognized signal")
 					users_recognized.append(userdata)
-					self.face_recognized(userdata, None, confidence)
 
 			except:
 				import sys, traceback
@@ -158,7 +155,7 @@ class RecognitionServer(Server):
 		if len(persons) != self.last_len_persons_detected or self.last_len_users != len(users_recognized):
 			self.last_len_persons_detected = len(persons)
 			self.last_len_users = len(users_recognized)
-			
+
 			self.persons_detected(persons, users_recognized)
 
 	def onMessage(self, msg, fromClient):
