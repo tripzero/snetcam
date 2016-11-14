@@ -5,6 +5,7 @@ import trollius as asyncio
 from base64 import b64decode, b64encode
 import numpy as np
 import cv2
+from datetime import datetime
 
 from .recognitionprotocol2 import Messages, Signals, ErrorMessages
 
@@ -39,6 +40,8 @@ class RecognitionServer(Server):
 		self.method_handlers["select_camera"] = self.select_camera
 		self.method_handlers["list_users_with_level"] = self.list_users_with_level
 		self.method_handlers["add_association"] = self.add_association
+
+		self.users_recognized = []
 
 		asyncio.get_event_loop().create_task(self.poll())
 
@@ -116,9 +119,20 @@ class RecognitionServer(Server):
 			yield asyncio.From(asyncio.sleep(1))
 
 
-	def process(self, persons):
+	def user_exists(self, userdata):
+		for user in self.users_recognized:
+			if user.uuid == userdata.uuid:
+				return True
 
-		users_recognized = []
+		return False
+
+	def scrub_users(self):
+		"removes users from list that haven't been seen in a 10 second span"
+		for user in self.users_recognized:
+			if (datetime.now() - user.last_seen).total_seconds() > 10:
+				self.users_recognized.remove(user)
+
+	def process(self, persons):
 
 		for person in persons:
 			try:
@@ -133,6 +147,7 @@ class RecognitionServer(Server):
 				uuid = user.recognition_id
 
 				userdata = self.recognizer.user(uuid=uuid)
+				userdata.last_seen = datetime.now()
 
 				if not userdata:
 					continue
@@ -142,7 +157,8 @@ class RecognitionServer(Server):
 
 				if confidence > 50:
 					print("confidence is good.  Sending face_recognized signal")
-					users_recognized.append(userdata)
+					if not self.user_exists(userdata):
+						self.users_recognized.append(userdata)
 
 			except:
 				import sys, traceback
@@ -151,12 +167,14 @@ class RecognitionServer(Server):
 				traceback.print_exception(exc_type, exc_value, exc_traceback,
 							limit=6, file=sys.stdout)
 
+		self.scrub_users()
 
 		if len(persons) != self.last_len_persons_detected or self.last_len_users != len(users_recognized):
+
 			self.last_len_persons_detected = len(persons)
 			self.last_len_users = len(users_recognized)
 
-			self.persons_detected(persons, users_recognized)
+			self.persons_detected(persons, self.users_recognized)
 
 	def onMessage(self, msg, fromClient):
 		print("message received!!!")
