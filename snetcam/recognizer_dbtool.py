@@ -17,12 +17,12 @@ if __name__ == "__main__":
 
 	if args.output_file:
 		with open(args.output_file, "w+") as db:
-			data = self.recognizer.serialize()
+			data = serv.serialize()
 			db.write(data)
 
 	elif args.input_file:
 		with open(args.input_file, "r") as db:
-			success = self.recognizer.deserialize(db.read())
+			success = serv.deserialize(db.read())
 			print("success: {}".format(success))
 
-	rospy.signal_shutdown()
+	rospy.signal_shutdown("Done")

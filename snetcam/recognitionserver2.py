@@ -1,5 +1,5 @@
 from wss import Server
-from recognizer import Recognizer
+from recognizer import Recognizer, User
 import json
 import trollius as asyncio
 from base64 import b64decode, b64encode
@@ -9,6 +9,10 @@ from datetime import datetime
 
 from .recognitionprotocol2 import Messages, Signals, ErrorMessages
 
+class AugmentedUser(User):
+	def __init__(self, user):
+		User.__init__(self, **user.to_json())
+		self.last_seen = None
 
 class CameraBase:
 
@@ -147,10 +151,12 @@ class RecognitionServer(Server):
 				uuid = user.recognition_id
 
 				userdata = self.recognizer.user(uuid=uuid)
-				userdata.last_seen = datetime.now()
 
 				if not userdata:
 					continue
+
+				userdata = AugmentedUser(userdata)
+				userdata.last_seen = datetime.now()
 
 				print("user recognized: {}".format(userdata.username))
 				print("confidence: {}".format(confidence))
@@ -169,10 +175,10 @@ class RecognitionServer(Server):
 
 		self.scrub_users()
 
-		if len(persons) != self.last_len_persons_detected or self.last_len_users != len(users_recognized):
+		if len(persons) != self.last_len_persons_detected or self.last_len_users != len(self.users_recognized):
 
 			self.last_len_persons_detected = len(persons)
-			self.last_len_users = len(users_recognized)
+			self.last_len_users = len(self.users_recognized)
 
 			self.persons_detected(persons, self.users_recognized)
 
